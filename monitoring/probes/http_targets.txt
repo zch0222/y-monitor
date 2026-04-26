@@ -1,0 +1,10 @@
+# target                         direction
+# direction: cn | global | self
+https://www.baidu.com            cn
+https://mirrors.aliyun.com        cn
+https://cloud.tencent.com         cn
+https://github.com                global
+https://www.cloudflare.com        global
+https://www.google.com            global
+# https://blog.example.com        self
+# https://s3.example.com          self

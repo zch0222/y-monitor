@@ -1,0 +1,8 @@
+# target                  direction
+# direction: cn | global | self
+www.baidu.com:443         cn
+mirrors.aliyun.com:443     cn
+github.com:443            global
+www.cloudflare.com:443    global
+# blog.example.com:443    self
+# s3.example.com:443      self

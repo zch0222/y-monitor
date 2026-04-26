@@ -1,0 +1,42 @@
+services:
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - "--path.rootfs=/host"
+      - "--web.listen-address=${TS_IP}:9100"
+    volumes:
+      - "/:/host:ro,rslave"
+
+  blackbox_exporter:
+    image: prom/blackbox-exporter:latest
+    container_name: blackbox_exporter
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_RAW
+    command:
+      - "--config.file=/etc/blackbox_exporter/blackbox.yml"
+      - "--web.listen-address=${TS_IP}:9115"
+    volumes:
+      - "./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro"
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    command:
+      - "--listen_ip=${TS_IP}"
+      - "--port=8080"
+      - "--docker_only=true"
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"

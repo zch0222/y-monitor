@@ -1,0 +1,6 @@
+# target          direction
+# direction: cn | global
+223.5.5.5         cn
+119.29.29.29      cn
+1.1.1.1           global
+8.8.8.8           global

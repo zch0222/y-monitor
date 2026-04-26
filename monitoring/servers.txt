@@ -1,0 +1,6 @@
+# TailscaleIP      node_name   region   cadvisor
+# Format: <tailscale_ipv4> <node_name> <region> <cadvisor: yes|no>
+# Example:
+# 100.85.140.54      jp-01       jp       yes
+# 100.100.100.11     hk-01       hk       yes
+# 100.100.100.12     us-01       us       yes

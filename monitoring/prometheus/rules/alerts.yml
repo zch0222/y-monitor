@@ -1,0 +1,85 @@
+groups:
+  - name: server-alerts
+    rules:
+      - alert: ServerDown
+        expr: up{job="node_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "服务器离线: {{ $labels.node }}"
+          description: "{{ $labels.node }} / {{ $labels.instance }} 的 node_exporter 已连续 2 分钟不可达。"
+
+      - alert: BlackboxExporterDown
+        expr: up{job="blackbox_exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Blackbox Exporter 不可达: {{ $labels.node }}"
+          description: "{{ $labels.node }} 的 blackbox_exporter 已连续 2 分钟不可达。"
+
+      - alert: CadvisorDown
+        expr: up{job="cadvisor"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "cAdvisor 不可达: {{ $labels.node }}"
+          description: "{{ $labels.node }} 的 cAdvisor 已连续 2 分钟不可达。"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance, node) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "CPU 使用率过高: {{ $labels.node }}"
+          description: "{{ $labels.node }} CPU 使用率超过 85%，已持续 5 分钟。"
+
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "内存使用率过高: {{ $labels.node }}"
+          description: "{{ $labels.node }} 内存使用率超过 85%，已持续 5 分钟。"
+
+      - alert: DiskSpaceLow
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "磁盘空间不足: {{ $labels.node }}"
+          description: "{{ $labels.node }} / {{ $labels.mountpoint }} 磁盘使用率超过 85%。"
+
+  - name: network-alerts
+    rules:
+      - alert: BlackboxProbeFailed
+        expr: probe_success{job=~"blackbox_http|blackbox_icmp|blackbox_tcp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "网络探测失败: {{ $labels.probe_node }} -> {{ $labels.target }}"
+          description: "{{ $labels.probe_node }} 从 {{ $labels.probe_region }} 探测 {{ $labels.target }} 失败，方向：{{ $labels.direction }}。"
+
+      - alert: BlackboxHighLatency
+        expr: probe_duration_seconds{job=~"blackbox_http|blackbox_icmp|blackbox_tcp"} > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "网络延迟较高: {{ $labels.probe_node }} -> {{ $labels.target }}"
+          description: "{{ $labels.probe_node }} 探测 {{ $labels.target }} 耗时超过 2 秒，方向：{{ $labels.direction }}。"
+
+      - alert: SSLCertExpiringSoon
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SSL 证书即将过期: {{ $labels.target }}"
+          description: "{{ $labels.target }} 的 SSL 证书将在 7 天内过期。"
