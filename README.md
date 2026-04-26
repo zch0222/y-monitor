@@ -80,31 +80,36 @@ y-monitor/
 scp -r monitor-agent/ root@<服务器IP>:~/monitor-agent
 ```
 
-**2. （可选）修改时区**
-
-默认时区为 `Asia/Shanghai`，如需修改：
-
-```bash
-cd ~/monitor-agent
-cp .env.example .env
-vim .env   # 修改 TZ
-```
-
-**3. 运行部署脚本**
+**2. 运行部署脚本**
 
 ```bash
 cd ~/monitor-agent
 bash setup.sh
 ```
 
-脚本会自动读取 Tailscale IP 写入 `.env` 并启动所有容器。如果 `.env` 已存在，只更新 `TS_IP`，`TZ` 等自定义值保持不变。
+脚本执行流程：
+- 自动读取本机 Tailscale IP
+- 若 `.env` 不存在：从 `.env.example` 复制并写入 `TS_IP`
+- 若 `.env` 已存在：仅更新 `TS_IP`，其他自定义值（如 `TZ`）保持不变
+- 启动所有容器（`docker compose up -d`）
+- 等待 3 秒后自动验证端口监听，并打印将该节点加入 `servers.txt` 的具体命令
 
-**4. 验证**
+**（可选）自定义时区**
+
+默认时区为 `Asia/Shanghai`。如需修改，在运行 `setup.sh` 之前手动创建 `.env`：
 
 ```bash
-# 查看容器状态
-docker compose ps
+cp .env.example .env
+vim .env   # 修改 TZ
+```
 
+这样 `setup.sh` 发现 `.env` 已存在，只会更新 `TS_IP`，`TZ` 不会被覆盖。
+
+**3. 验证**
+
+setup.sh 启动后会自动打印端口监听结果。如需手动验证：
+
+```bash
 # 确认监听在 Tailscale IP（不应出现 0.0.0.0）
 ss -lntp | grep -E '9100|9115|8080'
 
@@ -167,13 +172,14 @@ Prometheus data retention [30d]:
 
 后续再次运行 `setup.sh` 会直接加载已有 `.env`，不再提示。
 
-脚本还会：
-- 修复 Grafana 数据目录权限
-- 生成 Prometheus target 文件
+脚本还会依次执行：
+- 创建运行时数据目录（`data/prometheus`、`data/alertmanager`、`grafana/data`）
+- 修复 Grafana 数据目录权限（`chown 472:472`）
+- 生成 Prometheus target 文件（`gen-targets.sh`）
 
 **3. 添加被监控节点**
 
-编辑 `servers.txt`：
+编辑 `servers.txt`，每行一台节点：
 
 ```text
 # TailscaleIP      node_name   region   cadvisor
@@ -181,14 +187,18 @@ Prometheus data retention [30d]:
 100.100.100.11     hk-01       hk       yes
 ```
 
-字段说明：
-
 | 字段 | 说明 |
 |------|------|
 | TailscaleIP | 被监控服务器的 Tailscale IPv4（`tailscale ip -4`） |
 | node_name | 节点名，用于 Grafana 展示和告警 |
 | region | 区域标签，如 `jp` `hk` `us` `sg` `cn` |
 | cadvisor | 是否采集 Docker 容器指标，`yes` 或 `no` |
+
+修改后重新生成 Prometheus target 文件：
+
+```bash
+./gen-targets.sh
+```
 
 **4. 配置网络探测目标（可选）**
 
@@ -203,14 +213,20 @@ https://s3.example.com      self
 
 同理可编辑 `probes/icmp_targets.txt` 和 `probes/tcp_targets.txt`，修改后执行 `./gen-targets.sh` 重新生成。
 
-**5. 配置 Nginx**
-
-参考 `nginx/monitor.conf` 示例，将 `monitor.example.com` 替换为实际域名后，手动部署到 Nginx：
+**5. 启动服务**
 
 ```bash
-# 按实际域名修改后复制
+docker compose up -d
+docker compose ps
+```
+
+**6. 配置 Nginx**
+
+参考 `nginx/monitor.conf` 示例，将 `monitor.example.com` 替换为实际域名后部署：
+
+```bash
 cp nginx/monitor.conf /etc/nginx/conf.d/monitor.conf
-vim /etc/nginx/conf.d/monitor.conf
+vim /etc/nginx/conf.d/monitor.conf   # 替换域名和证书路径
 ```
 
 在 `/etc/nginx/nginx.conf` 的 `http {}` 块中加入（Grafana Live WebSocket 支持）：
@@ -224,13 +240,6 @@ map $http_upgrade $connection_upgrade {
 
 ```bash
 nginx -t && systemctl reload nginx
-```
-
-**6. 启动服务**
-
-```bash
-docker compose up -d
-docker compose ps
 ```
 
 **7. 验证**
@@ -410,7 +419,7 @@ du -sh ~/y-monitor/monitoring/data/prometheus/
 
 ---
 
-## 九、数据备份
+## 九、数据备份与迁移
 
 ```bash
 cd ~
