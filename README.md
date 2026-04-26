@@ -58,8 +58,7 @@ y-monitor/
     ├── alertmanager/
     │   └── alertmanager.yml
     └── nginx/
-        ├── monitor.conf.template   # Nginx 配置模板
-        └── monitor.conf            # 由 setup.sh 生成，不纳入版本控制
+        └── monitor.conf            # Nginx 配置示例，自行复制修改后使用
 ```
 
 ---
@@ -125,7 +124,6 @@ curl "http://$(tailscale ip -4 | head -n1):9115/probe?target=https://www.baidu.c
 - 已安装 Docker 和 Docker Compose
 - 已安装并登录 Tailscale
 - 已配置域名 DNS，准备好 SSL 证书（Let's Encrypt 或其他）
-- 已安装 `gettext`（提供 `envsubst`）：`apt install gettext-base`
 
 ### 步骤
 
@@ -136,23 +134,42 @@ git clone <repo_url> ~/y-monitor
 cd ~/y-monitor/monitoring
 ```
 
-**2. 配置 `.env`**
+**2. 运行初始化脚本**
 
 ```bash
-cp .env.example .env
-vim .env
+bash setup.sh
 ```
 
-`.env` 中所有变量说明：
+首次运行时，脚本会交互式提示填写所有配置项并生成 `.env`：
 
-| 变量 | 说明 | 示例 |
-|------|------|------|
+```
+========================================
+  First-time setup — configure .env
+========================================
+
+Timezone for all containers [Asia/Shanghai]:
+Grafana admin username [admin]:
+Grafana admin password: ****
+Confirm password: ****
+Grafana public domain (e.g. monitor.example.com): monitor.example.com
+Prometheus data retention [30d]:
+```
+
+`.env` 中各变量说明：
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
 | `TZ` | 所有容器的时区 | `Asia/Shanghai` |
 | `GF_ADMIN_USER` | Grafana 管理员用户名 | `admin` |
-| `GF_ADMIN_PASSWORD` | Grafana 管理员密码（**务必修改**） | `MyStr0ngPass!` |
-| `DOMAIN` | Grafana 公开访问域名 | `monitor.example.com` |
-| `CERT_DIR` | SSL 证书目录（含 `fullchain.pem` 和 `privkey.pem`） | `/etc/letsencrypt/live/monitor.example.com` |
+| `GF_ADMIN_PASSWORD` | Grafana 管理员密码（**务必修改**） | 无 |
+| `DOMAIN` | Grafana 公开访问域名 | 无 |
 | `PROMETHEUS_RETENTION` | Prometheus 数据保留时长 | `30d` |
+
+后续再次运行 `setup.sh` 会直接加载已有 `.env`，不再提示。
+
+脚本还会：
+- 修复 Grafana 数据目录权限
+- 生成 Prometheus target 文件
 
 **3. 添加被监控节点**
 
@@ -184,23 +201,19 @@ https://s3.example.com      self
 
 方向标签：`cn`（国内）、`global`（国际）、`self`（自有服务）
 
-同理可编辑 `probes/icmp_targets.txt` 和 `probes/tcp_targets.txt`。
+同理可编辑 `probes/icmp_targets.txt` 和 `probes/tcp_targets.txt`，修改后执行 `./gen-targets.sh` 重新生成。
 
-**5. 运行初始化脚本**
+**5. 配置 Nginx**
+
+参考 `nginx/monitor.conf` 示例，将 `monitor.example.com` 替换为实际域名后，手动部署到 Nginx：
 
 ```bash
-bash setup.sh
+# 按实际域名修改后复制
+cp nginx/monitor.conf /etc/nginx/conf.d/monitor.conf
+vim /etc/nginx/conf.d/monitor.conf
 ```
 
-脚本会：
-- 校验 `.env` 存在且变量完整
-- 修复 Grafana 目录权限
-- 从 `nginx/monitor.conf.template` 生成 `nginx/monitor.conf`
-- 生成 Prometheus target 文件
-
-**6. 配置 Nginx**
-
-在 `/etc/nginx/nginx.conf` 的 `http {}` 块中加入：
+在 `/etc/nginx/nginx.conf` 的 `http {}` 块中加入（Grafana Live WebSocket 支持）：
 
 ```nginx
 map $http_upgrade $connection_upgrade {
@@ -209,27 +222,18 @@ map $http_upgrade $connection_upgrade {
 }
 ```
 
-复制生成的站点配置：
-
 ```bash
-cp nginx/monitor.conf /etc/nginx/conf.d/monitor.conf
 nginx -t && systemctl reload nginx
 ```
 
-**7. 申请 SSL 证书（如尚未申请）**
-
-```bash
-certbot --nginx -d monitor.example.com
-```
-
-**8. 启动服务**
+**6. 启动服务**
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-**9. 验证**
+**7. 验证**
 
 ```bash
 # 检查 Prometheus 配置语法
@@ -239,7 +243,7 @@ docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
 ss -lntp | grep -E '9090|9093|3000'
 ```
 
-访问 Grafana：`https://<DOMAIN>`，使用 `.env` 中设置的账号密码登录。
+访问 Grafana：`https://<DOMAIN>`，使用配置时填写的账号密码登录。
 
 ---
 

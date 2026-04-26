@@ -13,8 +13,5 @@ monitoring/prometheus/targets/*.yml
 monitor-agent/.env
 monitoring/.env
 
-# Generated nginx config (produced by setup.sh from monitor.conf.template)
-monitoring/nginx/monitor.conf
-
 # OS
 .DS_Store
