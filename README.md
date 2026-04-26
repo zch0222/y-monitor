@@ -114,7 +114,7 @@ setup.sh 启动后会自动打印端口监听结果。如需手动验证：
 ss -lntp | grep -E '9100|9115|8080'
 
 # 验证指标可访问
-curl http://$(tailscale ip -4 | head -n1):9100/metrics | head
+curl "http://$(tailscale ip -4 | head -n1):9100/metrics" | head
 curl "http://$(tailscale ip -4 | head -n1):9115/probe?target=https://www.baidu.com&module=http_2xx" | grep probe_success
 ```
 
