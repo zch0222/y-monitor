@@ -1172,13 +1172,13 @@
     {
       "id": 45,
       "type": "timeseries",
-      "title": "探测耗时趋势（按目标 + 探测节点）",
+      "title": "HTTP 探测耗时趋势",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 73 },
       "targets": [
         {
-          "expr": "probe_duration_seconds{job=~\"blackbox_http|blackbox_icmp|blackbox_tcp\", probe_node=~\"$node\", direction=~\"$direction\"}",
-          "legendFormat": "{{probe_node}} → {{target}} ({{probe_type}})",
+          "expr": "probe_duration_seconds{job=\"blackbox_http\", probe_node=~\"$node\", direction=~\"$direction\"}",
+          "legendFormat": "{{probe_node}} → {{target}}",
           "refId": "A"
         }
       ],
@@ -1192,11 +1192,97 @@
             "fillOpacity": 0,
             "showPoints": "never",
             "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1.5 },
+              { "color": "red", "value": 4 }
+            ]
           }
         }
       },
       "options": {
-        "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max", "lastNotNull"] },
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 46,
+      "type": "timeseries",
+      "title": "ICMP 探测耗时趋势",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 81 },
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"blackbox_icmp\", probe_node=~\"$node\", direction=~\"$direction\"}",
+          "legendFormat": "{{probe_node}} → {{target}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1.5 },
+              { "color": "red", "value": 4 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      }
+    },
+    {
+      "id": 47,
+      "type": "timeseries",
+      "title": "TCP 探测耗时趋势",
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 89 },
+      "targets": [
+        {
+          "expr": "probe_duration_seconds{job=\"blackbox_tcp\", probe_node=~\"$node\", direction=~\"$direction\"}",
+          "legendFormat": "{{probe_node}} → {{target}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "decimals": 3,
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 0,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1.5 },
+              { "color": "red", "value": 4 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
         "tooltip": { "mode": "multi", "sort": "desc" }
       }
     },
@@ -1205,7 +1291,7 @@
       "type": "row",
       "title": "🔐 SSL 证书状态",
       "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 81 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 97 },
       "panels": []
     },
     {
@@ -1214,7 +1300,7 @@
       "title": "SSL 证书剩余有效期（HTTPS 探测目标）",
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "description": "排除了未启用 SSL（值为 0）的目标，避免误显示巨大的负数。",
-      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 82 },
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 98 },
       "targets": [
         {
           "expr": "(probe_ssl_earliest_cert_expiry{job=\"blackbox_http\", probe_node=~\"$node\", direction=~\"$direction\"} - time()) / 86400  and  probe_ssl_earliest_cert_expiry{job=\"blackbox_http\"} > 0",
