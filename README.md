@@ -318,7 +318,68 @@ ufw enable
 
 ---
 
-## 六、常用维护命令
+## 六、测试脚本
+
+每个目录下各有两个测试脚本，部署后运行验证。
+
+### monitor-agent
+
+```bash
+cd ~/monitor-agent
+
+# 冒烟测试：验证三个 exporter 正常运行并返回有效指标
+bash smoke-test.sh
+
+# 安全测试：验证端口绑定和配置合规性
+bash security-test.sh
+```
+
+**smoke-test.sh** 检查项：
+- 三个容器（node_exporter / blackbox_exporter / cadvisor）状态为 running
+- 三个 HTTP 端点（:9100 / :9115 / :8080）返回 200
+- blackbox HTTP 探测 https://www.baidu.com → `probe_success 1`
+- blackbox ICMP 探测 223.5.5.5 → `probe_success 1`
+
+**security-test.sh** 检查项：
+- 端口 9100 / 9115 / 8080 未绑定到 `0.0.0.0`（不暴露公网）
+- 端口 9100 / 9115 / 8080 未绑定到 `127.0.0.1`（确保 Prometheus 可跨机采集）
+- 端口 9100 / 9115 / 8080 绑定在 Tailscale IP
+- `docker-compose.yml` 无 `ports:` 映射
+- `.env` 未被 git 追踪
+
+### monitoring
+
+```bash
+cd ~/y-monitor/monitoring
+
+# 冒烟测试：验证中心监控服务健康且采集正常
+bash smoke-test.sh
+
+# 安全测试：验证端口绑定、配置安全性和敏感文件
+bash security-test.sh
+```
+
+**smoke-test.sh** 检查项：
+- 三个容器（prometheus / grafana / alertmanager）状态为 running
+- 三个健康接口（`/-/healthy` / `/api/health`）返回 200
+- `prometheus.yml` 和 `alerts.yml` 语法合法（promtool）
+- 六个 target 文件存在且非空
+- Prometheus 至少有一个 UP 的 scrape target
+
+**security-test.sh** 检查项：
+- 端口 9090 / 9093 / 3000 未绑定到 `0.0.0.0`
+- 端口 9090 / 9093 / 3000 绑定在 `127.0.0.1`
+- 端口 9094（Alertmanager cluster gossip）未监听
+- `docker-compose.yml` 无 `ports:` 映射
+- Prometheus / Alertmanager 监听地址配置正确
+- Grafana 禁止公开注册，Cookie 安全标志已开启
+- `.env` 未被 git 追踪
+- Grafana admin 密码已修改（非默认值）
+
+---
+
+## 七、常用维护命令
+
 
 ```bash
 # 查看容器状态
@@ -345,7 +406,7 @@ docker exec -it grafana grafana cli \
 
 ---
 
-## 七、告警配置
+## 八、告警配置
 
 默认已内置以下告警规则（`prometheus/rules/alerts.yml`）：
 
@@ -367,7 +428,7 @@ docker exec -it grafana grafana cli \
 
 ---
 
-## 八、数据保留配置
+## 九、数据保留配置
 
 Prometheus 默认将采集到的时序数据存储在 `monitoring/data/prometheus/` 目录，保留时长由 `.env` 中的 `PROMETHEUS_RETENTION` 控制，最终传递给容器启动参数 `--storage.tsdb.retention.time`。
 
@@ -419,7 +480,7 @@ du -sh ~/y-monitor/monitoring/data/prometheus/
 
 ---
 
-## 九、数据备份与迁移
+## 十、数据备份与迁移
 
 ```bash
 cd ~
