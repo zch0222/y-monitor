@@ -109,7 +109,44 @@ else
   fail "GF_SECURITY_COOKIE_SECURE=true" "cookies not marked Secure — risky over HTTPS proxy"
 fi
 
+if grep -q 'GF_AUTH_ANONYMOUS_ENABLED=false' docker-compose.yml; then
+  pass "GF_AUTH_ANONYMOUS_ENABLED=false"
+else
+  fail "GF_AUTH_ANONYMOUS_ENABLED=false" "anonymous access may be enabled"
+fi
+
+if grep -q 'GF_SECURITY_CONTENT_SECURITY_POLICY=true' docker-compose.yml; then
+  pass "GF_SECURITY_CONTENT_SECURITY_POLICY=true"
+else
+  fail "GF_SECURITY_CONTENT_SECURITY_POLICY=true" "CSP header not enabled"
+fi
+
 # ── 4. Sensitive files ────────────────────────────────────────────────────────
+
+section "Nginx configuration"
+
+nginx_conf="nginx/monitor.conf"
+if [[ -f "$nginx_conf" ]]; then
+  if grep -q 'ssl_protocols' "$nginx_conf"; then
+    pass "nginx ssl_protocols restriction present"
+  else
+    fail "nginx ssl_protocols restriction present" "add 'ssl_protocols TLSv1.2 TLSv1.3' to $nginx_conf"
+  fi
+
+  if grep -q 'limit_req' "$nginx_conf"; then
+    pass "nginx login rate limiting present"
+  else
+    fail "nginx login rate limiting present" "add limit_req to /login in $nginx_conf"
+  fi
+
+  if grep -q 'server_tokens off' "$nginx_conf"; then
+    pass "nginx server_tokens off"
+  else
+    fail "nginx server_tokens off" "add 'server_tokens off' to $nginx_conf"
+  fi
+else
+  echo "  [SKIP] nginx/monitor.conf not found"
+fi
 
 section "Sensitive files"
 

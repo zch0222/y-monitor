@@ -229,9 +229,13 @@ cp nginx/monitor.conf /etc/nginx/conf.d/monitor.conf
 vim /etc/nginx/conf.d/monitor.conf   # 替换域名和证书路径
 ```
 
-在 `/etc/nginx/nginx.conf` 的 `http {}` 块中加入（Grafana Live WebSocket 支持）：
+在 `/etc/nginx/nginx.conf` 的 `http {}` 块中加入以下内容（二者都需要）：
 
 ```nginx
+# Grafana 登录限速：每 IP 10 次/分钟
+limit_req_zone $binary_remote_addr zone=grafana_login:10m rate=10r/m;
+
+# WebSocket 升级支持（Grafana Live）
 map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
@@ -241,6 +245,17 @@ map $http_upgrade $connection_upgrade {
 ```bash
 nginx -t && systemctl reload nginx
 ```
+
+示例配置已包含以下公网安全强化：
+
+| 项目 | 配置 |
+|------|------|
+| TLS 版本 | 仅允许 TLSv1.2 / TLSv1.3 |
+| 密码套件 | ECDHE/DHE + AEAD，禁用弱密码 |
+| HSTS | `max-age=86400; includeSubDomains` |
+| 登录限速 | `/login` 每 IP 10 req/min，burst 5 |
+| 安全响应头 | `X-Frame-Options`、`X-Content-Type-Options`、`Referrer-Policy` |
+| 版本隐藏 | `server_tokens off` |
 
 **7. 验证**
 
