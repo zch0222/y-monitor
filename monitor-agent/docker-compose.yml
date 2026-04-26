@@ -5,17 +5,27 @@ services:
     restart: unless-stopped
     network_mode: host
     pid: host
+    environment:
+      - TZ=Asia/Shanghai
     command:
       - "--path.rootfs=/host"
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc|rootfs|var/lib/docker/.+|var/lib/kubelet/.+)($$|/)"
+      - "--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$$"
       - "--web.listen-address=${TS_IP}:9100"
     volumes:
       - "/:/host:ro,rslave"
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
 
   blackbox_exporter:
     image: prom/blackbox-exporter:latest
     container_name: blackbox_exporter
     restart: unless-stopped
     network_mode: host
+    environment:
+      - TZ=Asia/Shanghai
     cap_add:
       - NET_RAW
     command:
@@ -25,15 +35,19 @@ services:
       - "./blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro"
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.49.2
     container_name: cadvisor
     restart: unless-stopped
     network_mode: host
     privileged: true
+    environment:
+      - TZ=Asia/Shanghai
     command:
       - "--listen_ip=${TS_IP}"
       - "--port=8080"
       - "--docker_only=true"
+      - "--housekeeping_interval=15s"
+      - "--disable_metrics=disk,percpu,sched,tcp,udp,advtcp,process,hugetlb,referenced_memory,cpu_topology,resctrl"
     volumes:
       - "/:/rootfs:ro"
       - "/var/run:/var/run:ro"

@@ -67,6 +67,9 @@ scrape_configs:
       - source_labels: [blackbox_address]
         target_label: __address__
 
+      - action: labeldrop
+        regex: blackbox_address
+
   - job_name: "blackbox_icmp"
     metrics_path: /probe
     params:
@@ -88,6 +91,9 @@ scrape_configs:
       - source_labels: [blackbox_address]
         target_label: __address__
 
+      - action: labeldrop
+        regex: blackbox_address
+
   - job_name: "blackbox_tcp"
     metrics_path: /probe
     params:
@@ -108,3 +114,6 @@ scrape_configs:
 
       - source_labels: [blackbox_address]
         target_label: __address__
+
+      - action: labeldrop
+        regex: blackbox_address

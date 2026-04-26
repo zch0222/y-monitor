@@ -5,7 +5,9 @@ modules:
     http:
       method: GET
       preferred_ip_protocol: "ip4"
-      valid_status_codes: []
+      valid_status_codes: [200, 201, 202, 204, 301, 302, 304]
+      follow_redirects: true
+      fail_if_ssl: false
 
   https_2xx:
     prober: http
@@ -13,8 +15,9 @@ modules:
     http:
       method: GET
       preferred_ip_protocol: "ip4"
+      valid_status_codes: [200, 201, 202, 204, 301, 302, 304]
       fail_if_not_ssl: true
-      valid_status_codes: []
+      follow_redirects: true
 
   tcp_connect:
     prober: tcp

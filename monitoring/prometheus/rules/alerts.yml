@@ -47,7 +47,7 @@ groups:
           description: "{{ $labels.node }} 内存使用率超过 85%，已持续 5 分钟。"
 
       - alert: DiskSpaceLow
-        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs"}) * 100 > 85
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|ramfs|nsfs|fuse.*"}) * 100 > 85
         for: 10m
         labels:
           severity: warning
@@ -66,20 +66,40 @@ groups:
           summary: "网络探测失败: {{ $labels.probe_node }} -> {{ $labels.target }}"
           description: "{{ $labels.probe_node }} 从 {{ $labels.probe_region }} 探测 {{ $labels.target }} 失败，方向：{{ $labels.direction }}。"
 
-      - alert: BlackboxHighLatency
-        expr: probe_duration_seconds{job=~"blackbox_http|blackbox_icmp|blackbox_tcp"} > 2
+      - alert: BlackboxHighLatencyDomestic
+        expr: probe_duration_seconds{job=~"blackbox_http|blackbox_icmp|blackbox_tcp", direction=~"cn|self"} > 1.5
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "网络延迟较高: {{ $labels.probe_node }} -> {{ $labels.target }}"
-          description: "{{ $labels.probe_node }} 探测 {{ $labels.target }} 耗时超过 2 秒，方向：{{ $labels.direction }}。"
+          summary: "国内 / 自有线路延迟较高: {{ $labels.probe_node }} -> {{ $labels.target }}"
+          description: "{{ $labels.probe_node }} 探测 {{ $labels.target }} 耗时超过 1.5 秒，方向：{{ $labels.direction }}。"
+
+      - alert: BlackboxHighLatencyGlobal
+        expr: probe_duration_seconds{job=~"blackbox_http|blackbox_icmp|blackbox_tcp", direction="global"} > 4
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "国际线路延迟较高: {{ $labels.probe_node }} -> {{ $labels.target }}"
+          description: "{{ $labels.probe_node }} 探测 {{ $labels.target }} 耗时超过 4 秒，方向：global。"
 
       - alert: SSLCertExpiringSoon
-        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        expr: probe_ssl_earliest_cert_expiry{job="blackbox_http"} > 0
+              and (probe_ssl_earliest_cert_expiry{job="blackbox_http"} - time()) < 86400 * 7
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "SSL 证书即将过期: {{ $labels.target }}"
           description: "{{ $labels.target }} 的 SSL 证书将在 7 天内过期。"
+
+      - alert: SSLCertExpired
+        expr: probe_ssl_earliest_cert_expiry{job="blackbox_http"} > 0
+              and (probe_ssl_earliest_cert_expiry{job="blackbox_http"} - time()) < 0
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SSL 证书已过期: {{ $labels.target }}"
+          description: "{{ $labels.target }} 的 SSL 证书已经过期，请立即续签。"
