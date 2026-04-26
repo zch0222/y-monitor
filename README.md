@@ -358,7 +358,59 @@ docker exec -it grafana grafana cli \
 
 ---
 
-## 八、数据备份
+## 八、数据保留配置
+
+Prometheus 默认将采集到的时序数据存储在 `monitoring/data/prometheus/` 目录，保留时长由 `.env` 中的 `PROMETHEUS_RETENTION` 控制，最终传递给容器启动参数 `--storage.tsdb.retention.time`。
+
+### 修改保留时长
+
+编辑 `.env`：
+
+```bash
+vim ~/y-monitor/monitoring/.env
+```
+
+修改 `PROMETHEUS_RETENTION`，支持的单位：
+
+| 单位 | 示例 | 说明 |
+|------|------|------|
+| `d` | `30d` | 天（最常用） |
+| `w` | `4w` | 周 |
+| `y` | `1y` | 年 |
+| `h` | `72h` | 小时 |
+
+修改后重启 Prometheus 生效：
+
+```bash
+cd ~/y-monitor/monitoring
+docker compose restart prometheus
+```
+
+### 磁盘占用估算
+
+实际占用取决于节点数量、采集频率和指标数量，以下为大致参考：
+
+| 节点数 | 保留时长 | 估算占用 |
+|--------|----------|----------|
+| 3 节点 | 30d | 2 ~ 5 GB |
+| 3 节点 | 90d | 6 ~ 15 GB |
+| 10 节点 | 30d | 8 ~ 20 GB |
+
+可以用以下命令查看当前实际占用：
+
+```bash
+du -sh ~/y-monitor/monitoring/data/prometheus/
+```
+
+### 注意事项
+
+- 缩短保留时长（如从 `90d` 改为 `30d`）并重启后，Prometheus 会在后台逐步清理过期数据块，**不会立即释放磁盘空间**，通常在数小时到一天内完成。
+- 如果磁盘空间紧张需要立即释放，可以停止容器后手动删除 `data/prometheus/` 下的旧数据块目录（文件名为 26 位 ULID 格式），但会丢失对应时段的历史数据。
+- Prometheus 没有按指标类型单独设置保留时长的选项，所有 job 的数据共用同一个保留策略。
+
+---
+
+## 九、数据备份
 
 ```bash
 cd ~
