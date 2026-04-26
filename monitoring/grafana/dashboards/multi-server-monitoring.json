@@ -1178,6 +1178,7 @@
       "targets": [
         {
           "expr": "probe_duration_seconds{job=\"blackbox_http\", probe_node=~\"$node\", direction=~\"$direction\"}",
+          "interval": "45s",
           "legendFormat": "{{probe_node}} → {{target}}",
           "refId": "A"
         }
@@ -1217,6 +1218,7 @@
       "targets": [
         {
           "expr": "probe_duration_seconds{job=\"blackbox_icmp\", probe_node=~\"$node\", direction=~\"$direction\"}",
+          "interval": "45s",
           "legendFormat": "{{probe_node}} → {{target}}",
           "refId": "A"
         }
@@ -1256,6 +1258,7 @@
       "targets": [
         {
           "expr": "probe_duration_seconds{job=\"blackbox_tcp\", probe_node=~\"$node\", direction=~\"$direction\"}",
+          "interval": "45s",
           "legendFormat": "{{probe_node}} → {{target}}",
           "refId": "A"
         }
