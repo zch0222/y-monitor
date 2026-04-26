@@ -31,11 +31,13 @@
 ```
 y-monitor/
 ├── monitor-agent/              # 部署到每台被监控服务器
+│   ├── .env.example            # 环境变量模板，复制为 .env 使用
 │   ├── docker-compose.yml
 │   ├── setup.sh
 │   └── blackbox/
 │       └── blackbox.yml
 └── monitoring/                 # 部署到中心监控机
+    ├── .env.example            # 环境变量模板，复制为 .env 使用
     ├── docker-compose.yml
     ├── servers.txt             # 维护被监控节点列表
     ├── gen-targets.sh          # 自动生成 Prometheus targets
@@ -49,11 +51,15 @@ y-monitor/
     │   ├── rules/alerts.yml
     │   └── targets/            # 由 gen-targets.sh 生成，不纳入版本控制
     ├── grafana/
-    │   └── provisioning/datasources/datasource.yml
+    │   ├── dashboards/         # 放置 Grafana 仪表盘 JSON 文件
+    │   └── provisioning/
+    │       ├── dashboards/dashboards.yml
+    │       └── datasources/datasource.yml
     ├── alertmanager/
     │   └── alertmanager.yml
     └── nginx/
-        └── monitor.conf
+        ├── monitor.conf.template   # Nginx 配置模板
+        └── monitor.conf            # 由 setup.sh 生成，不纳入版本控制
 ```
 
 ---
@@ -75,16 +81,26 @@ y-monitor/
 scp -r monitor-agent/ root@<服务器IP>:~/monitor-agent
 ```
 
-**2. 在服务器上运行部署脚本**
+**2. （可选）修改时区**
+
+默认时区为 `Asia/Shanghai`，如需修改：
+
+```bash
+cd ~/monitor-agent
+cp .env.example .env
+vim .env   # 修改 TZ
+```
+
+**3. 运行部署脚本**
 
 ```bash
 cd ~/monitor-agent
 bash setup.sh
 ```
 
-脚本会自动读取 Tailscale IP 写入 `.env`，并启动所有容器。
+脚本会自动读取 Tailscale IP 写入 `.env` 并启动所有容器。如果 `.env` 已存在，只更新 `TS_IP`，`TZ` 等自定义值保持不变。
 
-**3. 验证**
+**4. 验证**
 
 ```bash
 # 查看容器状态
@@ -109,6 +125,7 @@ curl "http://$(tailscale ip -4 | head -n1):9115/probe?target=https://www.baidu.c
 - 已安装 Docker 和 Docker Compose
 - 已安装并登录 Tailscale
 - 已配置域名 DNS，准备好 SSL 证书（Let's Encrypt 或其他）
+- 已安装 `gettext`（提供 `envsubst`）：`apt install gettext-base`
 
 ### 步骤
 
@@ -119,22 +136,23 @@ git clone <repo_url> ~/y-monitor
 cd ~/y-monitor/monitoring
 ```
 
-**2. 修改配置**
+**2. 配置 `.env`**
 
-编辑 `docker-compose.yml`，将 Grafana 域名改为实际域名：
-
-```yaml
-- GF_SERVER_ROOT_URL=https://monitor.example.com  # 改为你的域名
-- GF_SECURITY_ADMIN_PASSWORD=ChangeMe_123456       # 改为强密码
+```bash
+cp .env.example .env
+vim .env
 ```
 
-编辑 `nginx/monitor.conf`，替换域名和证书路径：
+`.env` 中所有变量说明：
 
-```nginx
-server_name monitor.example.com;               # 改为你的域名
-ssl_certificate /etc/letsencrypt/live/monitor.example.com/fullchain.pem;
-ssl_certificate_key /etc/letsencrypt/live/monitor.example.com/privkey.pem;
-```
+| 变量 | 说明 | 示例 |
+|------|------|------|
+| `TZ` | 所有容器的时区 | `Asia/Shanghai` |
+| `GF_ADMIN_USER` | Grafana 管理员用户名 | `admin` |
+| `GF_ADMIN_PASSWORD` | Grafana 管理员密码（**务必修改**） | `MyStr0ngPass!` |
+| `DOMAIN` | Grafana 公开访问域名 | `monitor.example.com` |
+| `CERT_DIR` | SSL 证书目录（含 `fullchain.pem` 和 `privkey.pem`） | `/etc/letsencrypt/live/monitor.example.com` |
+| `PROMETHEUS_RETENTION` | Prometheus 数据保留时长 | `30d` |
 
 **3. 添加被监控节点**
 
@@ -174,27 +192,44 @@ https://s3.example.com      self
 bash setup.sh
 ```
 
-脚本会修复 Grafana 目录权限并生成 Prometheus target 文件。
+脚本会：
+- 校验 `.env` 存在且变量完整
+- 修复 Grafana 目录权限
+- 从 `nginx/monitor.conf.template` 生成 `nginx/monitor.conf`
+- 生成 Prometheus target 文件
 
-**6. 启动服务**
+**6. 配置 Nginx**
+
+在 `/etc/nginx/nginx.conf` 的 `http {}` 块中加入：
+
+```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+```
+
+复制生成的站点配置：
+
+```bash
+cp nginx/monitor.conf /etc/nginx/conf.d/monitor.conf
+nginx -t && systemctl reload nginx
+```
+
+**7. 申请 SSL 证书（如尚未申请）**
+
+```bash
+certbot --nginx -d monitor.example.com
+```
+
+**8. 启动服务**
 
 ```bash
 docker compose up -d
 docker compose ps
 ```
 
-**7. 配置 Nginx 并申请证书**
-
-```bash
-# 申请证书（以 certbot 为例）
-certbot --nginx -d monitor.example.com
-
-# 复制 nginx 配置
-cp nginx/monitor.conf /etc/nginx/conf.d/monitor.conf
-nginx -t && systemctl reload nginx
-```
-
-**8. 验证**
+**9. 验证**
 
 ```bash
 # 检查 Prometheus 配置语法
@@ -204,7 +239,7 @@ docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
 ss -lntp | grep -E '9090|9093|3000'
 ```
 
-访问 Grafana：`https://monitor.example.com`，默认账号 `admin`，密码为步骤 2 中设置的值。
+访问 Grafana：`https://<DOMAIN>`，使用 `.env` 中设置的账号密码登录。
 
 ---
 
@@ -237,6 +272,8 @@ vim servers.txt   # 删除对应行
 ---
 
 ## 五、防火墙配置
+
+> **⚠️ 安全提示：** 务必先执行 `ufw allow OpenSSH`，再执行 `ufw enable`，否则会立刻断开 SSH 连接。
 
 **被监控服务器**
 
@@ -281,11 +318,13 @@ docker logs -f alertmanager
 
 # 校验 Prometheus 配置
 docker exec prometheus promtool check config /etc/prometheus/prometheus.yml
+docker exec prometheus promtool check rules /etc/prometheus/rules/alerts.yml
 
 # 热重载 Prometheus
 curl -X POST http://127.0.0.1:9090/-/reload
 
 # 重置 Grafana admin 密码
+# （GF_ADMIN_PASSWORD 仅首次初始化时生效，已有数据目录时需用此命令）
 docker exec -it grafana grafana cli \
   --homepath /usr/share/grafana \
   admin reset-admin-password 'NewStrongPassword'
@@ -306,14 +345,12 @@ docker exec -it grafana grafana cli \
 | HighMemoryUsage | 内存使用率 > 85% 持续 5 分钟 |
 | DiskSpaceLow | 磁盘使用率 > 85% 持续 10 分钟 |
 | BlackboxProbeFailed | 网络探测失败超过 2 分钟 |
-| BlackboxHighLatency | 探测延迟 > 2 秒持续 5 分钟 |
+| BlackboxHighLatencyDomestic | 国内/自有线路延迟 > 1.5 秒持续 5 分钟 |
+| BlackboxHighLatencyGlobal | 国际线路延迟 > 4 秒持续 5 分钟 |
 | SSLCertExpiringSoon | SSL 证书 7 天内到期 |
+| SSLCertExpired | SSL 证书已过期 |
 
-如需接入 Telegram、企业微信、邮件等通知，编辑 `alertmanager/alertmanager.yml` 的 `receivers` 部分，然后重启 Alertmanager：
-
-```bash
-docker compose restart alertmanager
-```
+> **注意：** 默认 `alertmanager/alertmanager.yml` 中 `receivers` 为空占位配置，**不会发送任何通知**。如需接收告警，编辑该文件配置 Webhook、Telegram 或邮件，然后重启：`docker compose restart alertmanager`
 
 ---
 
@@ -332,3 +369,5 @@ ssh root@新机器IP
 cd /root && tar -xzf monitoring-backup.tar.gz
 cd y-monitor/monitoring && docker compose up -d
 ```
+
+> Prometheus 30 天 TSDB 通常占几 GB 到几十 GB。若无需保留历史指标，可只备份配置文件（`servers.txt`、`probes/`、`prometheus/`、`alertmanager/`、`grafana/dashboards/`、`.env`），跳过 `data/` 和 `grafana/data/`。

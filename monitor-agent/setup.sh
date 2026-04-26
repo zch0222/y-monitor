@@ -16,9 +16,22 @@ if [[ -z "${TS_IP}" ]]; then
   exit 1
 fi
 
+# Write .env (preserve existing TZ if .env already exists)
+if [[ -f .env ]]; then
+  # Update TS_IP line only
+  sed -i "s/^TS_IP=.*/TS_IP=${TS_IP}/" .env
+else
+  # Create from example, then set TS_IP
+  cp .env.example .env
+  sed -i "s/^TS_IP=.*/TS_IP=${TS_IP}/" .env
+fi
+
 echo "==> Tailscale IP: ${TS_IP}"
-echo "TS_IP=${TS_IP}" > .env
 echo "==> Written to .env"
+echo ""
+echo "    Current .env:"
+cat .env
+echo ""
 
 echo "==> Starting agent containers..."
 docker compose up -d

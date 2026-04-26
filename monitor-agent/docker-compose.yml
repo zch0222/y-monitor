@@ -6,7 +6,7 @@ services:
     network_mode: host
     pid: host
     environment:
-      - TZ=Asia/Shanghai
+      - TZ=${TZ}
     command:
       - "--path.rootfs=/host"
       - "--path.procfs=/host/proc"
@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      - TZ=Asia/Shanghai
+      - TZ=${TZ}
     cap_add:
       - NET_RAW
     command:
@@ -41,7 +41,7 @@ services:
     network_mode: host
     privileged: true
     environment:
-      - TZ=Asia/Shanghai
+      - TZ=${TZ}
     command:
       - "--listen_ip=${TS_IP}"
       - "--port=8080"
