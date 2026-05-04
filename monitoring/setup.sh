@@ -154,6 +154,12 @@ echo "==> Fixing Grafana data directory permissions (UID 472)..."
 sudo chown -R 472:472 grafana/data
 sudo chmod -R u+rwX grafana/data
 
+if [[ "${LOKI_MODE}" == "embedded" ]]; then
+  echo "==> Fixing Loki data directory permissions (UID 10001)..."
+  sudo chown -R 10001:10001 data/loki
+  sudo chmod -R u+rwX data/loki
+fi
+
 # ── 3. Prometheus target files ────────────────────────────────────────────────
 echo "==> Generating Prometheus target files..."
 chmod +x gen-targets.sh

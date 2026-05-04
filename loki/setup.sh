@@ -62,6 +62,10 @@ fi
 
 mkdir -p data
 
+echo "==> Fixing Loki data directory permissions (UID 10001)..."
+sudo chown -R 10001:10001 data
+sudo chmod -R u+rwX data
+
 if [[ ! -f config/loki.yml ]]; then
   echo "ERROR: config/loki.yml not found."
   exit 1
