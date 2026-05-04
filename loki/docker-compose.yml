@@ -1,0 +1,16 @@
+services:
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=${TZ}
+      - LOKI_TS_IP=${LOKI_TS_IP}
+      - LOKI_RETENTION=${LOKI_RETENTION}
+    command:
+      - "-config.file=/etc/loki/loki.yml"
+      - "-config.expand-env=true"
+    volumes:
+      - "./config/loki.yml:/etc/loki/loki.yml:ro"
+      - "./data:/var/lib/loki"

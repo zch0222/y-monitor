@@ -41,7 +41,7 @@ section "Port binding"
 
 listeners=$(ss -lntp 2>/dev/null)
 
-for port in 9100 9115 8080; do
+for port in 9100 9115 8080 9080; do
   # Must NOT be bound to 0.0.0.0
   if echo "$listeners" | grep -q "0\.0\.0\.0:${port}"; then
     fail "Port $port NOT exposed on 0.0.0.0" "found 0.0.0.0:${port} — exporter may be reachable from public internet"
@@ -77,11 +77,40 @@ fi
 
 # All services use network_mode: host
 host_count=$(grep -c 'network_mode: host' docker-compose.yml || true)
-service_count=$(grep -c '^\s*[a-z_]*:$' docker-compose.yml || true)
-if [[ "$host_count" -ge 3 ]]; then
+if [[ "$host_count" -ge 4 ]]; then
   pass "All services use network_mode: host"
 else
-  fail "All services use network_mode: host" "found ${host_count}/3 services with network_mode: host"
+  fail "All services use network_mode: host" "found ${host_count}/4 services with network_mode: host"
+fi
+
+promtail_block=$(awk '
+  /^[[:space:]]{2}promtail:/ { in_block=1; print; next }
+  in_block && /^[[:space:]]{2}[a-zA-Z0-9_-]+:/ { in_block=0 }
+  in_block { print }
+' docker-compose.yml)
+
+if echo "$promtail_block" | grep -q '/var/run/docker.sock:/var/run/docker.sock:ro'; then
+  pass "Docker socket mounted read-only"
+else
+  fail "Docker socket mounted read-only" "Promtail should not get writable Docker socket"
+fi
+
+if echo "$promtail_block" | grep -q '/var/lib/docker'; then
+  fail "Docker root is not mounted into Promtail" "do not mount /var/lib/docker unless using static file scrape"
+else
+  pass "Docker root is not mounted into Promtail"
+fi
+
+if [[ -f promtail/config.yml ]] && grep -q '__meta_docker_container_label_logging' promtail/config.yml; then
+  pass "Promtail uses opt-in logging label filter"
+else
+  fail "Promtail uses opt-in logging label filter" "avoid collecting every container by default"
+fi
+
+if [[ -f promtail/config.yml ]] && grep -A20 '^[[:space:]]*- labels:' promtail/config.yml | grep -Eq 'trace[_-]?id:|user[_-]?id:|ip:|path:'; then
+  fail "Promtail labels avoid high-cardinality fields" "do not promote trace/user/ip/path to labels"
+else
+  pass "Promtail labels avoid high-cardinality fields"
 fi
 
 # ── 3. Sensitive files ────────────────────────────────────────────────────────

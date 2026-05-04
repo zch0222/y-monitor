@@ -42,12 +42,31 @@ services:
       - GF_SECURITY_X_XSS_PROTECTION=true
       - GF_SECURITY_CONTENT_SECURITY_POLICY=true
       - GF_METRICS_ENABLED=true
+      - LOKI_URL=${LOKI_URL}
     volumes:
       - "./grafana/data:/var/lib/grafana"
       - "./grafana/provisioning:/etc/grafana/provisioning:ro"
       - "./grafana/dashboards:/var/lib/grafana/dashboards:ro"
     depends_on:
       - prometheus
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    network_mode: host
+    profiles:
+      - loki
+    environment:
+      - TZ=${TZ}
+      - MONITOR_TS_IP=${MONITOR_TS_IP}
+      - LOKI_RETENTION=${LOKI_RETENTION}
+    command:
+      - "-config.file=/etc/loki/config.yml"
+      - "-config.expand-env=true"
+    volumes:
+      - "./loki/config.yml:/etc/loki/config.yml:ro"
+      - "./data/loki:/var/lib/loki"
 
   alertmanager:
     image: prom/alertmanager:latest

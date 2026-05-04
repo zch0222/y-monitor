@@ -32,13 +32,15 @@ echo ""
 echo "========================================"
 echo "  monitor-agent smoke test"
 echo "  TS_IP: ${TS_IP}"
+echo "  NODE_NAME: ${NODE_NAME:-not set}"
+echo "  LOKI_PUSH_URL: ${LOKI_PUSH_URL:-not set}"
 echo "========================================"
 
 # ── 1. Container status ───────────────────────────────────────────────────────
 
 section "Container status"
 
-for name in node_exporter blackbox_exporter cadvisor; do
+for name in node_exporter blackbox_exporter cadvisor promtail; do
   state=$(docker inspect --format='{{.State.Status}}' "$name" 2>/dev/null || echo "missing")
   if [[ "$state" == "running" ]]; then
     pass "$name is running"
@@ -65,6 +67,34 @@ http_ok() {
 http_ok "http://${TS_IP}:9100/metrics"  "node_exporter /metrics"
 http_ok "http://${TS_IP}:9115/metrics"  "blackbox_exporter /metrics"
 http_ok "http://${TS_IP}:8080/metrics"  "cadvisor /metrics"
+http_ok "http://${TS_IP}:9080/ready"    "promtail /ready"
+http_ok "http://${TS_IP}:9080/metrics"  "promtail /metrics"
+
+# ── 2b. Promtail dependencies ─────────────────────────────────────────────────
+
+section "Promtail dependencies"
+
+if [[ -z "${LOKI_PUSH_URL:-}" ]]; then
+  fail "LOKI_PUSH_URL is configured" "set LOKI_PUSH_URL in .env"
+else
+  loki_base="${LOKI_PUSH_URL%/loki/api/v1/push}"
+  http_ok "${loki_base}/ready" "Loki /ready from agent"
+fi
+
+if [[ -S /var/run/docker.sock ]]; then
+  pass "Docker socket exists"
+else
+  fail "Docker socket exists" "/var/run/docker.sock not found"
+fi
+
+logging_promtail=$(docker ps --filter "label=logging=promtail" -q | wc -l | tr -d ' ')
+logging_true=$(docker ps --filter "label=logging=true" -q | wc -l | tr -d ' ')
+logging_count=$((logging_promtail + logging_true))
+if [[ "$logging_count" -gt 0 ]]; then
+  pass "At least one container is labeled for Promtail"
+else
+  echo "  [WARN] no containers with logging=promtail/logging=true label"
+fi
 
 # ── 3. Blackbox probe ─────────────────────────────────────────────────────────
 

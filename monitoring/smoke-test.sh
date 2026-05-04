@@ -38,6 +38,8 @@ set -a; source .env; set +a
 echo ""
 echo "========================================"
 echo "  monitoring smoke test"
+echo "  LOKI_MODE: ${LOKI_MODE:-external}"
+echo "  LOKI_URL: ${LOKI_URL:-not set}"
 echo "========================================"
 
 # ── 1. Container status ───────────────────────────────────────────────────────
@@ -60,6 +62,39 @@ section "HTTP health endpoints"
 http_ok "http://127.0.0.1:9090/-/healthy"   "Prometheus /-/healthy"
 http_ok "http://127.0.0.1:9093/-/healthy"   "Alertmanager /-/healthy"
 http_ok "http://127.0.0.1:3000/api/health"  "Grafana /api/health"
+
+# ── 2b. Loki ─────────────────────────────────────────────────────────────────
+
+section "Loki"
+
+if [[ -z "${LOKI_URL:-}" ]]; then
+  fail "LOKI_URL is configured" "set LOKI_URL in .env"
+else
+  http_ok "${LOKI_URL%/}/ready" "Loki /ready via LOKI_URL"
+fi
+
+if [[ "${LOKI_MODE:-external}" == "embedded" ]]; then
+  state=$(docker inspect --format='{{.State.Status}}' loki 2>/dev/null || echo "missing")
+  if [[ "$state" == "running" ]]; then
+    pass "loki is running"
+  else
+    fail "loki" "state=$state"
+  fi
+
+  if [[ -n "${MONITOR_TS_IP:-}" ]]; then
+    http_ok "http://${MONITOR_TS_IP}:3100/ready" "Loki /ready on monitoring Tailscale IP"
+  else
+    fail "MONITOR_TS_IP is configured" "set MONITOR_TS_IP in .env"
+  fi
+else
+  echo "  [SKIP] local loki container check (LOKI_MODE=${LOKI_MODE:-external})"
+fi
+
+if grep -q 'type: loki' grafana/provisioning/datasources/datasource.yml; then
+  pass "Grafana Loki datasource is provisioned"
+else
+  fail "Grafana Loki datasource is provisioned" "add Loki datasource to datasource.yml"
+fi
 
 # ── 3. Config validation ──────────────────────────────────────────────────────
 

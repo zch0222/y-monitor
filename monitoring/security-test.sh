@@ -27,6 +27,8 @@ set -a; source .env; set +a
 echo ""
 echo "========================================"
 echo "  monitoring security test"
+echo "  LOKI_MODE: ${LOKI_MODE:-external}"
+echo "  LOKI_URL: ${LOKI_URL:-not set}"
 echo "========================================"
 
 # ── 1. Port binding ───────────────────────────────────────────────────────────
@@ -57,6 +59,34 @@ if echo "$listeners" | grep -q ":9094"; then
     "9094 is open — add '--cluster.listen-address=' to alertmanager command"
 else
   pass "Alertmanager cluster port 9094 is not listening"
+fi
+
+section "Loki exposure"
+
+if [[ "${LOKI_MODE:-external}" == "embedded" ]]; then
+  if echo "$listeners" | grep -q "0\.0\.0\.0:3100"; then
+    fail "Loki port 3100 not exposed on 0.0.0.0" "bind Loki to MONITOR_TS_IP"
+  else
+    pass "Loki port 3100 not exposed on 0.0.0.0"
+  fi
+
+  if [[ -n "${MONITOR_TS_IP:-}" ]] && echo "$listeners" | grep -q "${MONITOR_TS_IP}:3100"; then
+    pass "Loki listening on monitoring Tailscale IP"
+  else
+    fail "Loki listening on monitoring Tailscale IP" "${MONITOR_TS_IP:-unset}:3100 not found"
+  fi
+else
+  if echo "$listeners" | grep -q ":3100"; then
+    fail "No local Loki listener in external mode" "LOKI_MODE=external but port 3100 is listening"
+  else
+    pass "No local Loki listener in external mode"
+  fi
+fi
+
+if [[ "${LOKI_URL:-}" =~ ^http://(100\.|[a-zA-Z0-9.-]+\.ts\.net) ]]; then
+  pass "LOKI_URL uses Tailscale address"
+else
+  fail "LOKI_URL uses Tailscale address" "avoid public Loki exposure"
 fi
 
 # ── 2. Docker Compose configuration ───────────────────────────────────────────

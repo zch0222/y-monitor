@@ -54,3 +54,22 @@ services:
       - "/sys:/sys:ro"
       - "/var/lib/docker/:/var/lib/docker:ro"
       - "/dev/disk/:/dev/disk:ro"
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=${TZ}
+      - TS_IP=${TS_IP}
+      - ENVIRONMENT=${ENVIRONMENT}
+      - NODE_NAME=${NODE_NAME}
+      - LOKI_PUSH_URL=${LOKI_PUSH_URL}
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+      - "-config.expand-env=true"
+    volumes:
+      - "./promtail/config.yml:/etc/promtail/config.yml:ro"
+      - "./data/promtail:/var/lib/promtail"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
